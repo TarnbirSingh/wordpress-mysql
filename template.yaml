@@ -1,7 +1,7 @@
 name: "wordpress-mysql"
 display_name: "WordPress + MySQL"
-description: "Individuelle WordPress + MySQL Instanz pro Studierenden. Jeder Student erhält eine eigene VM mit vollständig konfiguriertem WordPress, eigenem Admin-Zugang und isolierter MySQL-Datenbank."
-version: "1.0.0"
+description: "Shared VM mit einer WordPress-Instanz pro Studierenden. Jeder Student erhält einen eigenen WordPress-Admin-Zugang auf einem eigenen Port (8001, 8002, ...) — isolierte MySQL-Datenbank inklusive."
+version: "1.1.0"
 category: "education"
 author: "DHBW CloudStore Team"
 icon: wordpress.png
@@ -14,8 +14,8 @@ email_credentials:
   enabled: true
 
 deploy-strategy:
-  one-instance: false
-  one-per-user: true
+  one-instance: true
+  one-per-user: false
   one-per-group: false
 
 tags:
@@ -70,7 +70,7 @@ parameters:
 
     - name: student_emails
       type: array
-      description: "Studierende (je eine eigene VM + WordPress-Instanz)"
+      description: "Studierende (je eine WordPress-Instanz auf eigenem Port)"
       required: true
       validation:
         min_items: 1
@@ -80,6 +80,7 @@ parameters:
         in_group_order: 3
         icon: Users
         placeholder: "Studierende auswählen..."
+        hint: "Student 1 → Port 8001, Student 2 → Port 8002, ..."
         widget:
           type: user-picker
           multi: true
@@ -88,21 +89,21 @@ parameters:
   specific:
     - name: flavor_name
       type: selection
-      description: "VM-Größe pro Student (WordPress läuft auf Small)"
+      description: "VM-Größe (eine VM für alle Studenten)"
       required: true
-      default: "gp1.small"
+      default: "gp1.medium"
       options:
-        - label: "Small (1 CPU, 2GB RAM)"
+        - label: "Small (1 CPU, 2GB RAM) — bis ~5 Studenten"
           value: "gp1.small"
-        - label: "Medium (2 CPU, 4GB RAM)"
+        - label: "Medium (2 CPU, 4GB RAM) — Empfohlen"
           value: "gp1.medium"
-        - label: "Large (4 CPU, 8GB RAM)"
+        - label: "Large (4 CPU, 8GB RAM) — ab 15 Studenten"
           value: "gp1.large"
       x-ui:
         group_id: resources
         in_group_order: 1
         icon: Cpu
-        hint: "WordPress läuft problemlos auf Small — Medium nur bei vielen Plugins"
+        hint: "Eine VM für alle — Medium reicht für bis zu 15 Studenten"
 
     - name: wordpress_version
       type: string
@@ -129,23 +130,27 @@ parameters:
 
 outputs:
   - name: instance_id
-    description: "System ID der ersten Student-VM"
+    description: "System ID der Instanz"
     display: false
 
   - name: app_name
     description: "Name der Anwendung"
     display: true
 
+  - name: ssh_command
+    description: "SSH-Zugang zur VM"
+    display: true
+
   - name: student_credentials
-    description: "Zugangsdaten aller Studierenden (WordPress + SSH)"
+    description: "WordPress-Zugangsdaten aller Studierenden"
     sensitive: true
     display: false
 
   - name: ssh_private_key
-    description: "SSH Private Key für VM-Zugang"
+    description: "SSH Private Key"
     sensitive: true
     display: false
 
 estimated_costs:
-  hourly: "0.05 - 0.10 EUR pro Student"
-  monthly: "35 - 70 EUR pro Student"
+  hourly: "0.05 - 0.15 EUR gesamt"
+  monthly: "35 - 110 EUR gesamt"

@@ -24,7 +24,7 @@ variable "use_mock_provider" {
 
 variable "app_name" {
   type        = string
-  description = "Präfix für alle VM-Namen"
+  description = "Name der WordPress-Instanz"
   validation {
     condition     = can(regex("^[a-z0-9-]{3,20}$", var.app_name))
     error_message = "app_name: Nur Kleinbuchstaben, Zahlen und Bindestriche erlaubt (3-20 Zeichen)."
@@ -42,7 +42,7 @@ variable "admin_email" {
 
 variable "student_emails" {
   type        = list(string)
-  description = "E-Mails der Studierenden (je eine eigene VM + WordPress-Instanz)"
+  description = "E-Mails der Studierenden (je eine WordPress-Instanz auf eigenem Port)"
   validation {
     condition     = length(var.student_emails) >= 1 && length(var.student_emails) <= 20
     error_message = "student_emails: Mindestens 1, maximal 20 E-Mail-Adressen."
@@ -57,8 +57,8 @@ variable "student_emails" {
 
 variable "flavor_name" {
   type        = string
-  description = "OpenStack Flavor (VM-Größe) pro Student"
-  default     = "gp1.small"
+  description = "OpenStack Flavor (VM-Größe) — eine VM für alle Studenten"
+  default     = "gp1.medium"
   validation {
     condition     = contains(["gp1.small", "gp1.medium", "gp1.large"], var.flavor_name)
     error_message = "flavor_name: Muss 'gp1.small', 'gp1.medium' oder 'gp1.large' sein."
@@ -73,7 +73,7 @@ variable "wordpress_version" {
 
 variable "site_title" {
   type        = string
-  description = "WordPress Site-Titel"
+  description = "WordPress Site-Titel (gilt für alle Instanzen)"
   default     = "DHBW Web-Kurs"
 }
 
