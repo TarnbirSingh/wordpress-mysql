@@ -21,7 +21,7 @@ output "student_credentials" {
   sensitive   = true
   value = {
     for idx, email in var.student_emails : email => {
-      username      = replace(replace(lower(email), "@", "_"), ".", "_")
+      username      = split("@", email)[0]
       email         = email
       password      = random_password.student_passwords[email].result
       mysql_password = random_password.mysql_passwords[email].result

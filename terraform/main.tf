@@ -162,7 +162,7 @@ resource "openstack_compute_instance_v2" "wordpress_server" {
       for idx, email in var.student_emails : {
         index    = idx + 1
         port     = 8001 + idx
-        username = replace(replace(lower(email), "@", "_"), ".", "_")
+        username = split("@", email)[0]
         email    = email
         password = random_password.student_passwords[email].result
         mysql_password = random_password.mysql_passwords[email].result
