@@ -1,156 +1,154 @@
-name: "wordpress-mysql"
-display_name: "WordPress + MySQL"
-description: "Shared VM mit einer WordPress-Instanz pro Studierenden. Jeder Student erhält einen eigenen WordPress-Admin-Zugang auf einem eigenen Port (8001, 8002, ...) — isolierte MySQL-Datenbank inklusive."
-version: "1.1.0"
-category: "education"
-author: "DHBW CloudStore Team"
-icon: wordpress.png
+template:
+  name: "wordpress-mysql"
+  display_name: "WordPress + MySQL"
+  description: "Shared VM mit einer WordPress-Instanz pro Studierenden. Jeder Student erhält einen eigenen WordPress-Admin-Zugang auf einem eigenen Port (8001, 8002, ...) — isolierte MySQL-Datenbank inklusive."
+  version: "1.1.0"
+  category: "education"
+  author: "DHBW CloudStore Team"
+  icon: wordpress.png
 
-terraform:
-  working_dir: terraform/
-  required_version: ">= 1.6.0"
+  terraform:
+    working_dir: terraform/
+    required_version: ">= 1.6.0"
 
-email_credentials:
-  enabled: true
+  email_credentials:
+    enabled: true
 
-deploy-strategy:
-  one-instance: true
-  one-per-user: false
-  one-per-group: false
+  deploy-strategy:
+    one-instance: true
 
-tags:
-  - wordpress
-  - mysql
-  - php
-  - web
-  - education
+  tags:
+    - wordpress
+    - mysql
+    - php
+    - web
+    - education
 
-ui-groups:
-  - id: general
-    title: "Allgemein und Nutzer"
-    order: 1
-  - id: resources
-    title: "Ressourcen"
-    order: 2
-  - id: wordpress
-    title: "WordPress-Optionen"
-    order: 3
-    collapsed: true
+  ui-groups:
+    - id: general
+      title: "Allgemein und Nutzer"
+      order: 1
+    - id: resources
+      title: "Ressourcen"
+      order: 2
+    - id: wordpress
+      title: "WordPress-Optionen"
+      order: 3
+      collapsed: true
 
-parameters:
-  general:
+  parameters:
+    general:
+      - name: app_name
+        type: string
+        description: "Name der WordPress-Instanz (z.B. wwi23sea-wp)"
+        required: true
+        validation:
+          pattern: "^[a-z0-9-]{3,20}$"
+        x-ui:
+          group_id: general
+          in_group_order: 1
+          icon: Server
+          placeholder: "z.B. wwi23sea-wp"
+          hint: "Nur Kleinbuchstaben, Zahlen und Bindestriche (3-20 Zeichen)"
+
+      - name: admin_email
+        type: string
+        description: "E-Mail des Dozenten (erhält alle Credentials zur Kontrolle)"
+        required: true
+        validation:
+          pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+        x-ui:
+          group_id: general
+          in_group_order: 2
+          icon: Users
+          placeholder: "dozent@dhbw-mannheim.de"
+          widget:
+            type: user-picker
+            multi: false
+            extract: email
+
+      - name: student_emails
+        type: array
+        description: "Studierende (je eine WordPress-Instanz auf eigenem Port)"
+        required: true
+        validation:
+          min_items: 1
+          max_items: 20
+        x-ui:
+          group_id: general
+          in_group_order: 3
+          icon: Users
+          placeholder: "Studierende auswählen..."
+          hint: "Student 1 → Port 8001, Student 2 → Port 8002, ..."
+          widget:
+            type: user-picker
+            multi: true
+            extract: email
+
+      - name: flavor_name
+        type: selection
+        description: "VM-Größe (eine VM für alle Studenten)"
+        required: true
+        default: "gp1.medium"
+        options:
+          - label: "Small (1 CPU, 2GB RAM) — bis ~5 Studenten"
+            value: "gp1.small"
+          - label: "Medium (2 CPU, 4GB RAM) — Empfohlen"
+            value: "gp1.medium"
+          - label: "Large (4 CPU, 8GB RAM) — ab 15 Studenten"
+            value: "gp1.large"
+        x-ui:
+          group_id: resources
+          in_group_order: 1
+          icon: Cpu
+          hint: "Eine VM für alle — Medium reicht für bis zu 15 Studenten"
+
+      - name: wordpress_version
+        type: string
+        description: "WordPress Version"
+        required: false
+        default: "6.5"
+        x-ui:
+          group_id: wordpress
+          in_group_order: 1
+          icon: Server
+          placeholder: "6.5"
+          hint: "Aktuelle stabile Version aus dem WordPress-Repository"
+
+      - name: site_title
+        type: string
+        description: "WordPress Site-Titel für alle Instanzen"
+        required: false
+        default: "DHBW Web-Kurs"
+        x-ui:
+          group_id: wordpress
+          in_group_order: 2
+          icon: Server
+          placeholder: "DHBW Web-Kurs"
+
+  outputs:
+    - name: instance_id
+      description: "System ID der Instanz"
+      display: false
+
     - name: app_name
-      type: string
-      description: "Präfix für alle VM-Namen (z.B. wwi23sea-wp)"
-      required: true
-      validation:
-        pattern: "^[a-z0-9-]{3,20}$"
-      x-ui:
-        group_id: general
-        in_group_order: 1
-        icon: Server
-        placeholder: "z.B. wwi23sea-wp"
-        hint: "Nur Kleinbuchstaben, Zahlen und Bindestriche (3-20 Zeichen)"
+      description: "Name der Anwendung"
+      display: true
 
-    - name: admin_email
-      type: string
-      description: "E-Mail des Dozenten (erhält alle Credentials zur Kontrolle)"
-      required: true
-      validation:
-        pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
-      x-ui:
-        group_id: general
-        in_group_order: 2
-        icon: Users
-        placeholder: "dozent@dhbw-mannheim.de"
-        widget:
-          type: user-picker
-          multi: false
-          extract: email
+    - name: ssh_command
+      description: "SSH-Zugang zur VM"
+      display: true
 
-    - name: student_emails
-      type: array
-      description: "Studierende (je eine WordPress-Instanz auf eigenem Port)"
-      required: true
-      validation:
-        min_items: 1
-        max_items: 20
-      x-ui:
-        group_id: general
-        in_group_order: 3
-        icon: Users
-        placeholder: "Studierende auswählen..."
-        hint: "Student 1 → Port 8001, Student 2 → Port 8002, ..."
-        widget:
-          type: user-picker
-          multi: true
-          extract: email
+    - name: student_credentials
+      description: "WordPress-Zugangsdaten aller Studierenden"
+      sensitive: true
+      display: false
 
-  specific:
-    - name: flavor_name
-      type: selection
-      description: "VM-Größe (eine VM für alle Studenten)"
-      required: true
-      default: "gp1.medium"
-      options:
-        - label: "Small (1 CPU, 2GB RAM) — bis ~5 Studenten"
-          value: "gp1.small"
-        - label: "Medium (2 CPU, 4GB RAM) — Empfohlen"
-          value: "gp1.medium"
-        - label: "Large (4 CPU, 8GB RAM) — ab 15 Studenten"
-          value: "gp1.large"
-      x-ui:
-        group_id: resources
-        in_group_order: 1
-        icon: Cpu
-        hint: "Eine VM für alle — Medium reicht für bis zu 15 Studenten"
+    - name: ssh_private_key
+      description: "SSH Private Key"
+      sensitive: true
+      display: false
 
-    - name: wordpress_version
-      type: string
-      description: "WordPress Version"
-      required: false
-      default: "6.5"
-      x-ui:
-        group_id: wordpress
-        in_group_order: 1
-        icon: Server
-        placeholder: "6.5"
-        hint: "Aktuelle stabile Version aus dem WordPress-Repository"
-
-    - name: site_title
-      type: string
-      description: "WordPress Site-Titel für alle Instanzen"
-      required: false
-      default: "DHBW Web-Kurs"
-      x-ui:
-        group_id: wordpress
-        in_group_order: 2
-        icon: Server
-        placeholder: "DHBW Web-Kurs"
-
-outputs:
-  - name: instance_id
-    description: "System ID der Instanz"
-    display: false
-
-  - name: app_name
-    description: "Name der Anwendung"
-    display: true
-
-  - name: ssh_command
-    description: "SSH-Zugang zur VM"
-    display: true
-
-  - name: student_credentials
-    description: "WordPress-Zugangsdaten aller Studierenden"
-    sensitive: true
-    display: false
-
-  - name: ssh_private_key
-    description: "SSH Private Key"
-    sensitive: true
-    display: false
-
-estimated_costs:
-  hourly: "0.05 - 0.15 EUR gesamt"
-  monthly: "35 - 110 EUR gesamt"
+  estimated_costs:
+    hourly: "0.05 - 0.15 EUR gesamt"
+    monthly: "35 - 110 EUR gesamt"
