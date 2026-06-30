@@ -1,0 +1,151 @@
+name: "wordpress-mysql"
+display_name: "WordPress + MySQL"
+description: "Individuelle WordPress + MySQL Instanz pro Studierenden. Jeder Student erhält eine eigene VM mit vollständig konfiguriertem WordPress, eigenem Admin-Zugang und isolierter MySQL-Datenbank."
+version: "1.0.0"
+category: "education"
+author: "DHBW CloudStore Team"
+icon: wordpress.png
+
+terraform:
+  working_dir: terraform/
+  required_version: ">= 1.6.0"
+
+email_credentials:
+  enabled: true
+
+deploy-strategy:
+  one-instance: false
+  one-per-user: true
+  one-per-group: false
+
+tags:
+  - wordpress
+  - mysql
+  - php
+  - web
+  - education
+
+ui-groups:
+  - id: general
+    title: "Allgemein und Nutzer"
+    order: 1
+  - id: resources
+    title: "Ressourcen"
+    order: 2
+  - id: wordpress
+    title: "WordPress-Optionen"
+    order: 3
+    collapsed: true
+
+parameters:
+  general:
+    - name: app_name
+      type: string
+      description: "Präfix für alle VM-Namen (z.B. wwi23sea-wp)"
+      required: true
+      validation:
+        pattern: "^[a-z0-9-]{3,20}$"
+      x-ui:
+        group_id: general
+        in_group_order: 1
+        icon: Server
+        placeholder: "z.B. wwi23sea-wp"
+        hint: "Nur Kleinbuchstaben, Zahlen und Bindestriche (3-20 Zeichen)"
+
+    - name: admin_email
+      type: string
+      description: "E-Mail des Dozenten (erhält alle Credentials zur Kontrolle)"
+      required: true
+      validation:
+        pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+      x-ui:
+        group_id: general
+        in_group_order: 2
+        icon: Users
+        placeholder: "dozent@dhbw-mannheim.de"
+        widget:
+          type: user-picker
+          multi: false
+          extract: email
+
+    - name: student_emails
+      type: array
+      description: "Studierende (je eine eigene VM + WordPress-Instanz)"
+      required: true
+      validation:
+        min_items: 1
+        max_items: 20
+      x-ui:
+        group_id: general
+        in_group_order: 3
+        icon: Users
+        placeholder: "Studierende auswählen..."
+        widget:
+          type: user-picker
+          multi: true
+          extract: email
+
+  specific:
+    - name: flavor_name
+      type: selection
+      description: "VM-Größe pro Student (WordPress läuft auf Small)"
+      required: true
+      default: "gp1.small"
+      options:
+        - label: "Small (1 CPU, 2GB RAM)"
+          value: "gp1.small"
+        - label: "Medium (2 CPU, 4GB RAM)"
+          value: "gp1.medium"
+        - label: "Large (4 CPU, 8GB RAM)"
+          value: "gp1.large"
+      x-ui:
+        group_id: resources
+        in_group_order: 1
+        icon: Cpu
+        hint: "WordPress läuft problemlos auf Small — Medium nur bei vielen Plugins"
+
+    - name: wordpress_version
+      type: string
+      description: "WordPress Version"
+      required: false
+      default: "6.5"
+      x-ui:
+        group_id: wordpress
+        in_group_order: 1
+        icon: Server
+        placeholder: "6.5"
+        hint: "Aktuelle stabile Version aus dem WordPress-Repository"
+
+    - name: site_title
+      type: string
+      description: "WordPress Site-Titel für alle Instanzen"
+      required: false
+      default: "DHBW Web-Kurs"
+      x-ui:
+        group_id: wordpress
+        in_group_order: 2
+        icon: Server
+        placeholder: "DHBW Web-Kurs"
+
+outputs:
+  - name: instance_id
+    description: "System ID der ersten Student-VM"
+    display: false
+
+  - name: app_name
+    description: "Name der Anwendung"
+    display: true
+
+  - name: student_credentials
+    description: "Zugangsdaten aller Studierenden (WordPress + SSH)"
+    sensitive: true
+    display: false
+
+  - name: ssh_private_key
+    description: "SSH Private Key für VM-Zugang"
+    sensitive: true
+    display: false
+
+estimated_costs:
+  hourly: "0.05 - 0.10 EUR pro Student"
+  monthly: "35 - 70 EUR pro Student"

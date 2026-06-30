@@ -1,0 +1,160 @@
+#cloud-config
+
+# WordPress + MySQL Setup pro Student-VM
+# Installiert Apache2, PHP 8.1, MySQL 8.0, WordPress und WP-CLI.
+# WordPress wird per WP-CLI vollständig konfiguriert und mit dem Student als Admin angelegt.
+
+package_update: true
+package_upgrade: false
+
+# Verzeichnisse vor write_files anlegen (write_files braucht existierende Verzeichnisse)
+bootcmd:
+  - mkdir -p /opt/cloudstore /etc/cloudstore
+
+packages:
+  - curl
+  - ca-certificates
+  - tzdata
+  - ufw
+  - apache2
+  - php8.1
+  - php8.1-mysql
+  - php8.1-curl
+  - php8.1-gd
+  - php8.1-mbstring
+  - php8.1-xml
+  - php8.1-xmlrpc
+  - php8.1-zip
+  - libapache2-mod-php8.1
+  - mysql-server
+  - unzip
+
+write_files:
+  # Enthält alle Credentials als Referenz
+  - path: /etc/cloudstore/wordpress_info.txt
+    permissions: '0600'
+    content: |
+      CloudStore WordPress + MySQL Deployment
+      =======================================
+      Student:        ${student_email}
+      Username:       ${student_username}
+      Password:       ${student_password}
+      MySQL Password: ${mysql_password}
+      WordPress URL:  http://${floating_ip}
+      SSH:            ssh -i <private_key> ubuntu@${floating_ip}
+
+  # Setup-Script: MySQL + WordPress konfigurieren + WP-CLI install + wp core install
+  - path: /opt/cloudstore/setup_wordpress.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      set -e
+
+      STUDENT_USER="${student_username}"
+      STUDENT_PASS="${student_password}"
+      STUDENT_EMAIL="${student_email}"
+      MYSQL_PASS="${mysql_password}"
+      WP_URL="http://${floating_ip}"
+      SITE_TITLE="${site_title}"
+      WP_VERSION="${wordpress_version}"
+
+      # MySQL: Datenbank + User anlegen
+      mysql -u root <<SQL
+      CREATE DATABASE IF NOT EXISTS wordpress CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+      CREATE USER IF NOT EXISTS 'wordpress'@'localhost' IDENTIFIED BY '$$MYSQL_PASS';
+      GRANT ALL PRIVILEGES ON wordpress.* TO 'wordpress'@'localhost';
+      FLUSH PRIVILEGES;
+      SQL
+
+      # Linux-User für den Studenten anlegen (falls noch nicht vorhanden)
+      if ! id "$$STUDENT_USER" &>/dev/null; then
+        useradd -m -s /bin/bash "$$STUDENT_USER"
+        echo "$$STUDENT_USER:$$STUDENT_PASS" | chpasswd
+      fi
+
+      # WordPress herunterladen und entpacken
+      cd /tmp
+      curl -sO "https://wordpress.org/wordpress-$$WP_VERSION.tar.gz"
+      tar xzf "wordpress-$$WP_VERSION.tar.gz"
+      rsync -a --delete wordpress/ /var/www/html/
+      rm -rf wordpress "wordpress-$$WP_VERSION.tar.gz"
+
+      # wp-config.php erstellen
+      cp /var/www/html/wp-config-sample.php /var/www/html/wp-config.php
+      sed -i "s/database_name_here/wordpress/" /var/www/html/wp-config.php
+      sed -i "s/username_here/wordpress/" /var/www/html/wp-config.php
+      sed -i "s/password_here/$$MYSQL_PASS/" /var/www/html/wp-config.php
+
+      # Berechtigungen setzen
+      chown -R www-data:www-data /var/www/html/
+      chmod -R 755 /var/www/html/
+
+      # WP-CLI installieren
+      curl -sO https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
+      chmod +x wp-cli.phar
+      mv wp-cli.phar /usr/local/bin/wp
+
+      # Warten bis Apache bereit ist
+      until curl -sf http://localhost > /dev/null 2>&1; do
+        echo "Warte auf Apache..."
+        sleep 5
+      done
+
+      # WordPress via WP-CLI installieren
+      wp core install \
+        --url="$$WP_URL" \
+        --title="$$SITE_TITLE" \
+        --admin_user="$$STUDENT_USER" \
+        --admin_password="$$STUDENT_PASS" \
+        --admin_email="$$STUDENT_EMAIL" \
+        --allow-root \
+        --path=/var/www/html
+
+      echo "CloudStore: WordPress Setup abgeschlossen."
+
+  # Systemd-Unit: führt setup_wordpress.sh nach dem Boot aus
+  - path: /etc/systemd/system/cloudstore-wordpress-setup.service
+    permissions: '0644'
+    content: |
+      [Unit]
+      Description=CloudStore WordPress Setup
+      After=network-online.target mysql.service apache2.service
+      Wants=network-online.target
+      Requires=mysql.service apache2.service
+
+      [Service]
+      Type=oneshot
+      ExecStart=/opt/cloudstore/setup_wordpress.sh
+      RemainAfterExit=yes
+      StandardOutput=journal
+      StandardError=journal
+
+      [Install]
+      WantedBy=multi-user.target
+
+runcmd:
+  # UFW Firewall
+  - ufw --force enable
+  - ufw allow 22/tcp
+  - ufw allow 80/tcp
+
+  # Apache: Standard-index.html entfernen
+  - rm -f /var/www/html/index.html
+
+  # PHP 8.1 Repository einrichten (Ubuntu 22.04 hat PHP 8.1 im Standard-Repo)
+  - a2enmod rewrite
+  - a2enmod php8.1
+
+  # Apache: AllowOverride All für WordPress-Permalinks
+  - |
+    sed -i 's|<Directory /var/www/>|<Directory /var/www/>\n    AllowOverride All|' /etc/apache2/apache2.conf || true
+
+  # Setup-Service aktivieren und starten
+  - systemctl daemon-reload
+  - systemctl enable cloudstore-wordpress-setup.service
+  - systemctl start cloudstore-wordpress-setup.service
+
+final_message: |
+  WordPress ${wordpress_version} Setup läuft via cloudstore-wordpress-setup.service.
+  Student: ${student_email}
+  URL: http://${floating_ip}

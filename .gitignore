@@ -1,0 +1,10 @@
+clouds.yaml
+clouds.yml
+terraform.tfvars
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfvars
+.deployment-*/
+.claude/
